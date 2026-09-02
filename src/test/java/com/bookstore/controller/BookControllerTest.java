@@ -107,4 +107,63 @@ class BookControllerTest {
                         .content(objectMapper.writeValueAsString(book)))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void searchBooks_validQuery_returns200WithMatchingBook() throws Exception {
+        Book book = new Book();
+        book.setTitle("Search Test Title");
+        book.setAuthor("MatchableUniqueAuthor111");
+        book.setIsbn("978-0000000010");
+
+        MvcResult result = mockMvc.perform(post("/books")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(book)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        Book created = objectMapper.readValue(result.getResponse().getContentAsString(), Book.class);
+
+        mockMvc.perform(get("/books/search").param("q", "matchableuniqueauthor111"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value(created.getId().toString()))
+                .andExpect(jsonPath("$[0].author").value("MatchableUniqueAuthor111"));
+    }
+
+    @Test
+    void searchBooks_noMatch_returns200WithEmptyArray() throws Exception {
+        mockMvc.perform(get("/books/search").param("q", "zzznomatchzzz999"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
+    void searchBooks_missingQ_returns400() throws Exception {
+        mockMvc.perform(get("/books/search"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void searchBooks_blankQ_returns400() throws Exception {
+        mockMvc.perform(get("/books/search").param("q", ""))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void searchBooks_caseInsensitive_returns200WithMatch() throws Exception {
+        Book book = new Book();
+        book.setTitle("CaseInsensitiveTitleUnique777");
+        book.setAuthor("Some Author");
+        book.setIsbn("978-0000000011");
+
+        mockMvc.perform(post("/books")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(book)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/books/search").param("q", "CASEINSENSITIVETITLEUNIQUE777"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(greaterThanOrEqualTo(1))))
+                .andExpect(jsonPath("$[0].title").value("CaseInsensitiveTitleUnique777"));
+    }
 }
